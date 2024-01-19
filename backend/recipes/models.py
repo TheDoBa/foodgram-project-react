@@ -1,4 +1,6 @@
 from django.db import models
+from django.core.validators import MinValueValidator
+
 from core.validators import color_validator, slug_validator
 from users.models import FoodUser
 
@@ -78,7 +80,11 @@ class Recipe(models.Model):
         verbose_name='Теги',
         related_name='recipes')
     cooking_time = models.PositiveSmallIntegerField(
-        'Время приготовления в минутах')
+        'Время приготовления в минутах',
+        validators=[MinValueValidator(
+            1,
+            message='Время приготовления должно быть не менее одной минуты'),
+        ])
     pub_date = models.DateTimeField(
         'Дата публикации',
         auto_now_add=True)
@@ -99,7 +105,13 @@ class RecipeIngredient(models.Model):
         on_delete=models.CASCADE,
         verbose_name='Ингредиент',)
     amount = models.PositiveSmallIntegerField(
-        'Количество ингредиента')
+        'Количество ингредиента',
+        default=1,
+        validators=[MinValueValidator(
+            1,
+            message='Минимальное количество ингредиентов - 1',
+        )],
+    )
 
     class Meta:
         verbose_name = 'ингредиент рецепта'
@@ -145,7 +157,7 @@ class ShoppingCart(models.Model):
 
     class Meta:
         verbose_name = 'список покупок'
-        verbose_name_plural = 'Списки покупок'
+        verbose_name_plural = 'Список покупок'
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'recipe'],
