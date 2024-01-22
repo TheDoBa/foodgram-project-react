@@ -1,5 +1,6 @@
 import base64
 from django.core.files.base import ContentFile
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from recipes.models import (
@@ -237,10 +238,14 @@ class RecipeReadSerializer(serializers.ModelSerializer):
             'cooking_time',
         )
 
-    def get_ingredients(self, obj):
-        """Возвращает список ингредиентов."""
-        ingredients = obj.ingredients.all()
-        return IngredientAmountSerializer(ingredients, many=True).data
+    def get_ingredients(self, recipe):
+        """Получает ингредиенты для рецепта."""
+        ingredients = recipe.ingredients.values(
+            'id', 'name', 'measurement_unit',
+            amount=F('recipe_ingredients__amount')
+        )
+        return ingredients
+
 
     def get_is_favorited(self, obj):
         """Проверяет наличие рецепта в избранном."""

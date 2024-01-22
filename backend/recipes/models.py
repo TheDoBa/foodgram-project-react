@@ -95,6 +95,7 @@ class Recipe(models.Model):
         auto_now_add=True)
 
     class Meta:
+        
         verbose_name = 'рецепт'
         verbose_name_plural = 'Рецепты'
         ordering = ('-pub_date',)
@@ -120,6 +121,7 @@ class RecipeIngredient(models.Model):
     )
 
     class Meta:
+        default_related_name = 'recipe_ingredients'
         verbose_name = 'ингредиент рецепта'
         verbose_name_plural = 'Ингредиенты рецепта'
 
