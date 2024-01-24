@@ -1,12 +1,6 @@
-import csv
 import io
-from datetime import datetime
 from django.shortcuts import get_object_or_404
-from django.db.models import Sum, F, FloatField, Count
 from django.http import HttpResponse
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from django_filters import rest_framework as filters
@@ -25,8 +19,9 @@ from .serializers import (
     RecipeReadSerializer,
 )
 from core.filters import IngredientFilter
+from core.permissions import IsAdminOrReadOnly, IsAuthorOrReadOnly
 from users.models import Follow, FoodUser
-from recipes.models import Ingredient, Recipe, ShoppingCart, Tag, RecipeIngredient
+from recipes.models import Ingredient, Recipe, ShoppingCart, Tag
 
 
 class UserViewSet(DjoserUserViewSet):
@@ -36,13 +31,8 @@ class UserViewSet(DjoserUserViewSet):
     queryset = FoodUser.objects.all()
     http_method_names = ('get', 'post', 'delete')
 
-    def get_permissions(self):
-        """Дает доступ аутентифицированным пользователям."""
-        if self.action in ('me', 'subscribe', 'subscriptions'):
-            return (permissions.IsAuthenticated(),)
-        return (permissions.AllowAny(),)
-
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'],
+            permission_classes=[permissions.IsAuthenticated])
     def subscriptions(self, request):
         """Возвращает подписки."""
         user = self.request.user
@@ -53,7 +43,8 @@ class UserViewSet(DjoserUserViewSet):
         )
         return self.get_paginated_response(serializer.data)
 
-    @action(detail=True, methods=['post', 'delete'])
+    @action(detail=True, methods=['post', 'delete'],
+            permission_classes=[permissions.IsAuthenticated])
     def subscribe(self, request, id=None):
         """Метод для подписки и отписки."""
         user = self.request.user
@@ -71,6 +62,7 @@ class UserViewSet(DjoserUserViewSet):
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для работы с ингредиентами."""
 
+    permission_classes = (IsAdminOrReadOnly,)
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -82,6 +74,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для работы с тегами."""
 
+    permission_classes = (IsAdminOrReadOnly,)
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
@@ -91,6 +84,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
 class RecipeViewSet(viewsets.ModelViewSet):
     """Вьюсет для работы с рецептами."""
 
+    permission_classes = (IsAuthorOrReadOnly,)
     http_method_names = ('get', 'post', 'patch', 'delete')
     serializer_class = RecipeWriteSerializer
     queryset = Recipe.objects.all()
