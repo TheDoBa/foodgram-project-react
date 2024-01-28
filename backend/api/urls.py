@@ -10,16 +10,32 @@ from .views import (
 
 app_name = 'api'
 
-router = DefaultRouter()
+router_v1 = DefaultRouter()
 
-router.register('users', UserViewSet, 'users')
-router.register('tags', TagViewSet, 'tags')
-router.register('ingredients', IngredientViewSet, 'ingredients')
-router.register('recipes', RecipeViewSet, 'recipes')
+router_v1.register(
+    'users',
+    UserViewSet,
+    'users'
+)
+router_v1.register(
+    'tags',
+    TagViewSet,
+    'tags'
+)
+router_v1.register(
+    'ingredients',
+    IngredientViewSet,
+    'ingredients'
+)
+router_v1.register(
+    'recipes',
+    RecipeViewSet,
+    'recipes'
+)
 
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('', include(router_v1.urls)),
     path('', include('djoser.urls')),
     re_path(r'^auth/', include('djoser.urls.authtoken')),
 ]

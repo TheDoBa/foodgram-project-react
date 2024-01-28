@@ -1,9 +1,7 @@
-from django.db import models
 from django.core.validators import MinValueValidator
+from django.db import models
 
 from core.validators import color_validator, slug_validator
-from users.models import FoodUser
-
 from core.consts import (
     CHAR_FIELD_LENGTH,
     CHAR_FIELD_LENGTH_COLOR,
@@ -11,6 +9,7 @@ from core.consts import (
     CHAR_FIELD_LENGTH_MAX,
     MIN_VALUE_COOKING_TIME_AND_AMOUNT
 )
+from users.models import FoodUser
 
 
 class Ingredient(models.Model):
@@ -95,7 +94,7 @@ class Recipe(models.Model):
         auto_now_add=True)
 
     class Meta:
-        
+
         verbose_name = 'рецепт'
         verbose_name_plural = 'Рецепты'
         ordering = ('-pub_date',)
