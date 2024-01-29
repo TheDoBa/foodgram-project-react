@@ -114,7 +114,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if request.method == 'POST':
             if serializer.is_valid():
                 Favorite.objects.create(user=user, recipe=recipe)
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                return Response(
+                    serializer.data, status=status.HTTP_201_CREATED
+                )
         elif request.method == 'DELETE':
             Favorite.objects.filter(user=user, recipe=recipe).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
