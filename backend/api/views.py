@@ -118,8 +118,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 return Response(
                     serializer.data, status=status.HTTP_201_CREATED
                 )
-        if request.method == 'DELETE': 
-            Favorite.objects.filter(user=user, recipe=recipe).delete() 
+        if request.method == 'DELETE':
+            Favorite.objects.filter(user=user, recipe=recipe).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post', 'delete'],
