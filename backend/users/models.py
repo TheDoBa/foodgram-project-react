@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 from core.consts import CHAR_FIELD_LENGTH, EMAIL_FIELD_LENGTH
-from core.validators import username_validator
+from api.validators import username_validator
 
 
 class FoodUser(AbstractUser):
@@ -38,7 +38,7 @@ class FoodUser(AbstractUser):
         return f'{self.username} - {self.email}'
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+    REQUIRED_FIELDS = ('username', 'first_name', 'last_name')
 
 
 class Follow(models.Model):

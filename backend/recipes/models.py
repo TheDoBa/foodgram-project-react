@@ -1,7 +1,7 @@
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from core.validators import color_validator, slug_validator
+from api.validators import color_validator, slug_validator
 from core.consts import (
     CHAR_FIELD_LENGTH,
     CHAR_FIELD_LENGTH_COLOR,
@@ -61,6 +61,7 @@ class Recipe(models.Model):
         FoodUser,
         on_delete=models.CASCADE,
         verbose_name='Автор',
+        related_name='recipes'
     )
     name = models.CharField(
         'Название рецепта',

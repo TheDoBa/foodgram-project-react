@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .serializers import (
@@ -16,8 +17,8 @@ from .serializers import (
     RecipeWriteSerializer,
     RecipeReadSerializer,
 )
-from core.filters import IngredientFilter, RecipeFilter
-from core.permissions import IsAdminOrReadOnly, IsAuthorOrReadOnly
+from api.filters import IngredientFilter, RecipeFilter
+from api.permissions import IsAdminOrReadOnly, IsAuthorOrReadOnly
 from recipes.models import Favorite, Ingredient, Recipe, ShoppingCart, Tag
 from users.models import Follow, FoodUser
 
@@ -30,7 +31,7 @@ class UserViewSet(DjoserUserViewSet):
     http_method_names = ('get', 'post', 'delete')
 
     @action(detail=False, methods=('get',),
-            permission_classes=[permissions.IsAuthenticated])
+            permission_classes=(permissions.IsAuthenticated,))
     def subscriptions(self, request):
         """Возвращает подписки."""
         user = self.request.user
@@ -42,7 +43,7 @@ class UserViewSet(DjoserUserViewSet):
         return self.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=['post', 'delete'],
-            permission_classes=[permissions.IsAuthenticated])
+            permission_classes=(permissions.IsAuthenticated,))
     def subscribe(self, request, id=None):
         """Метод для подписки и отписки."""
         user = self.request.user
@@ -60,7 +61,7 @@ class UserViewSet(DjoserUserViewSet):
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для работы с ингредиентами."""
 
-    permission_classes = (IsAdminOrReadOnly,)
+    permission_classes = (AllowAny,)
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     pagination_class = None
@@ -98,7 +99,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return RecipeWriteSerializer
 
     @action(detail=True, methods=('post', 'delete'),
-            permission_classes=[permissions.IsAuthenticated])
+            permission_classes=(permissions.IsAuthenticated,))
     def favorite(self, request, pk=None):
         """Метод для добавления и удаления рецепта в избранное."""
         user = request.user
@@ -117,12 +118,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 return Response(
                     serializer.data, status=status.HTTP_201_CREATED
                 )
-        elif request.method == 'DELETE':
-            Favorite.objects.filter(user=user, recipe=recipe).delete()
+        if request.method == 'DELETE': 
+            Favorite.objects.filter(user=user, recipe=recipe).delete() 
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post', 'delete'],
-            permission_classes=[permissions.IsAuthenticated])
+            permission_classes=(permissions.IsAuthenticated,))
     def shopping_cart(self, request, pk=None):
         """Метод для добавления и удаления рецепта в список покупок."""
         recipe = get_object_or_404(Recipe, pk=pk)
@@ -146,7 +147,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=('get',),
-            permission_classes=[permissions.IsAuthenticated])
+            permission_classes=(permissions.IsAuthenticated,))
     def download_shopping_cart(self, request):
         """Отдает пользователю список для покупок в виде TXT файла."""
         user = request.user
@@ -159,18 +160,18 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
         ingredient_totals = {}
 
-        for item in shopping_cart:
+        for cart_item in shopping_cart:
             key = (
-                f'{item["recipe__ingredients__name"]} '
-                f'({item["recipe__ingredients__measurement_unit"]})'
+                f'{cart_item ["recipe__ingredients__name"]} '
+                f'({cart_item ["recipe__ingredients__measurement_unit"]})'
             )
             if key in ingredient_totals:
-                ingredient_totals[key] += item[
-                    "recipe__recipe_ingredients__amount"
+                ingredient_totals[key] += cart_item[
+                    'recipe__recipe_ingredients__amount'
                 ]
             else:
-                ingredient_totals[key] = item[
-                    "recipe__recipe_ingredients__amount"
+                ingredient_totals[key] = cart_item[
+                    'recipe__recipe_ingredients__amount'
                 ]
 
         response = HttpResponse(content_type='text/plain')

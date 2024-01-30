@@ -9,8 +9,7 @@ from recipes.models import Ingredient
 
 class Command(BaseCommand):
     """
-    Пользовательская команда управления Django для загрузки данных
-    из CSV-файлов в соответствующие модели.
+    Пользовательская команда управления Django для загрузки данных.
 
     Эта команда перебирает словарь моделей и путей к файлам CSV,
     загружая данные из каждого CSV-файла в соответствующую модель Django.
@@ -38,5 +37,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(
                 f'Файл {csv_file_path} не найден. Проверьте путь к файлу.'
             ))
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'Произошла ошибка: {str(e)}'))
+        except Exception as error:
+            self.stdout.write(
+                self.style.ERROR('Произошла ошибка: {}'.format(str(error)))
+            )

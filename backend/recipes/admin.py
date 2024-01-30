@@ -55,22 +55,27 @@ class RecipeAdmin(admin.ModelAdmin):
         'cooking_time',
         'display_ingredients',
         'display_tags',
-        'in_favorite_count',
+        'in_favourite_count',
     )
     search_fields = ('name',)
     list_filter = ('author', 'name', 'tags')
     ordering = ('name',)
 
+    def in_favourite_count(self, obj):
+        """Количество рецептов в избранном."""
+        return Favorite.objects.filter(recipe=obj).count()
+    in_favourite_count.short_description = 'В избранном'
+
     @admin.display(description='Ингредиенты')
-    def display_ingredients(self, obj):
+    def display_ingredients(self, recipe):
         return ', '.join(
-            ingredient.name for ingredient in obj.ingredients.all()
+            ingredient.name for ingredient in recipe.ingredients.all()
         )
 
     @admin.display(description='Теги')
-    def display_tags(self, obj):
+    def display_tags(self, recipe):
         return ', '.join(
-            tag.name for tag in obj.tags.all()
+            tag.name for tag in recipe.tags.all()
         )
 
 
