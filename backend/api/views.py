@@ -1,5 +1,5 @@
 import io
-from django.db.models import Sum, F
+from django.db.models import Sum
 from django_filters import rest_framework as filters
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -102,7 +102,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if self.request.method == 'GET':
             return RecipeReadSerializer
         return RecipeWriteSerializer
-    
+
     def get_permissions(self):
         """Распределение прав на действия."""
         if self.action in (
@@ -178,7 +178,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
 
         response = HttpResponse(content_type='text/plain')
-        response['Content-Disposition'] = 'attachment; filename="ShoppingList.txt"'
+        response['Content-Disposition'] = (
+            'attachment; filename="ShoppingList.txt"'
+        )
 
         with io.StringIO() as buffer:
             buffer.write('Список ингредиентов для покупок:\n')

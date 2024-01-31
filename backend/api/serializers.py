@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.db.models import F
 from rest_framework import serializers
-from core.consts import MIN_VALUE_COOKING_TIME_AND_AMOUNT
 
 from recipes.models import (
     Favorite,
