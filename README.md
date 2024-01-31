@@ -21,6 +21,43 @@
 
 [развёртывание проекта](./SetUp.md)
 
+## Примеры запроса в Postman:
+
+### 1 Пример:
+```
+http://localhost/api/recipes/
+```
+```
+{
+  "ingredients": [
+    {
+      "id": 4380,
+      "amount": 10
+    }
+  ],
+  "tags": [
+    1,
+    2
+  ],
+  "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAgMAAABieywaAAAACVBMVEUAAAD///9fX1/S0ecCAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAACklEQVQImWNoAAAAggCByxOyYQAAAABJRU5ErkJggg==",
+  "name": "string",
+  "text": "string",
+  "cooking_time": 1
+}
+```
+
+### 2 Пример:
+
+```
+http://localhost/api/auth/token/login/
+```
+```
+{
+"email": "22221@yandex.ru",
+"password": "Qwerty123"
+}
+```
+
 ## Комманда:
 
 [GitHub](https://github.com/yandex-praktikum) | Автор проекта - Yandex Practicum  

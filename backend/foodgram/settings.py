@@ -128,7 +128,5 @@ DJOSER = {
     'SERIALIZERS': {
         'user': 'api.serializers.FoodUserSerializer',
         'user_list': 'api.serializers.FoodUserSerializer',
-        'user_create': 'api.serializers.FoodUserSerializer',
-        'current_user': 'api.serializers.FoodUserSerializer',
     },
 }

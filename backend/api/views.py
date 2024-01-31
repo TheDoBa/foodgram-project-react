@@ -1,4 +1,5 @@
 import io
+from django.db.models import Sum, F
 from django_filters import rest_framework as filters
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -12,13 +13,14 @@ from .serializers import (
     FavoriteRecipeSerializer,
     FoodUserSerializer,
     FollowSerializer,
+    FollowSubSerializer,
     IngredientSerializer,
     TagSerializer,
     RecipeWriteSerializer,
     RecipeReadSerializer,
 )
 from api.filters import IngredientFilter, RecipeFilter
-from api.permissions import IsAdminOrReadOnly, IsAuthorOrReadOnly
+from api.permissions import IsAuthorOrReadOnly
 from recipes.models import Favorite, Ingredient, Recipe, ShoppingCart, Tag
 from users.models import Follow, FoodUser
 
@@ -30,8 +32,12 @@ class UserViewSet(DjoserUserViewSet):
     queryset = FoodUser.objects.all()
     http_method_names = ('get', 'post', 'delete')
 
-    @action(detail=False, methods=('get',),
-            permission_classes=(permissions.IsAuthenticated,))
+    def get_permissions(self):
+        if self.action in ('me', 'subscriptions', 'subscribe'):
+            return (permissions.IsAuthenticated(),)
+        return (permissions.AllowAny(),)
+
+    @action(detail=False, methods=('get',))
     def subscriptions(self, request):
         """Возвращает подписки."""
         user = self.request.user
@@ -42,15 +48,14 @@ class UserViewSet(DjoserUserViewSet):
         )
         return self.get_paginated_response(serializer.data)
 
-    @action(detail=True, methods=['post', 'delete'],
-            permission_classes=(permissions.IsAuthenticated,))
+    @action(detail=True, methods=('post', 'delete'))
     def subscribe(self, request, id=None):
         """Метод для подписки и отписки."""
         user = self.request.user
         following = self.get_object()
         if request.method == 'POST':
             Follow.objects.create(user=user, following=following)
-            serializer = FollowSerializer(
+            serializer = FollowSubSerializer(
                 following, context={'request': request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         if request.method == 'DELETE':
@@ -73,7 +78,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     """Вьюсет для работы с тегами."""
 
-    permission_classes = (IsAdminOrReadOnly,)
+    permission_classes = (AllowAny,)
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     pagination_class = None
@@ -97,6 +102,16 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if self.request.method == 'GET':
             return RecipeReadSerializer
         return RecipeWriteSerializer
+    
+    def get_permissions(self):
+        """Распределение прав на действия."""
+        if self.action in (
+            'favorite',
+            'shopping_cart',
+            'download_shopping_cart',
+        ):
+            return (permissions.IsAuthenticated(),)
+        return (IsAuthorOrReadOnly(),)
 
     @action(detail=True, methods=('post', 'delete'),
             permission_classes=(permissions.IsAuthenticated,))
@@ -122,7 +137,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             Favorite.objects.filter(user=user, recipe=recipe).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['post', 'delete'],
+    @action(detail=True, methods=('post', 'delete'),
             permission_classes=(permissions.IsAuthenticated,))
     def shopping_cart(self, request, pk=None):
         """Метод для добавления и удаления рецепта в список покупок."""
@@ -149,40 +164,30 @@ class RecipeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=('get',),
             permission_classes=(permissions.IsAuthenticated,))
     def download_shopping_cart(self, request):
-        """Отдает пользователю список для покупок в виде TXT файла."""
         user = request.user
-        shopping_cart = ShoppingCart.objects.filter(user=user).select_related(
-            'recipe__ingredients'
-        ).values(
-            'recipe__ingredients__name',
-            'recipe__ingredients__measurement_unit',
-            'recipe__recipe_ingredients__amount'
-        )
-        ingredient_totals = {}
 
-        for cart_item in shopping_cart:
-            key = (
-                f'{cart_item ["recipe__ingredients__name"]} '
-                f'({cart_item ["recipe__ingredients__measurement_unit"]})'
+        ingredient_totals = (
+            ShoppingCart.objects
+            .filter(user=user)
+            .select_related('recipe__ingredients')
+            .values(
+                'recipe__ingredients__name',
+                'recipe__ingredients__measurement_unit'
             )
-            if key in ingredient_totals:
-                ingredient_totals[key] += cart_item[
-                    'recipe__recipe_ingredients__amount'
-                ]
-            else:
-                ingredient_totals[key] = cart_item[
-                    'recipe__recipe_ingredients__amount'
-                ]
+            .annotate(amount=Sum('recipe__recipe_ingredients__amount'))
+        )
 
         response = HttpResponse(content_type='text/plain')
-        response['Content-Disposition'] = (
-            'attachment; filename="ShoppingList.txt"'
-        )
+        response['Content-Disposition'] = 'attachment; filename="ShoppingList.txt"'
 
         with io.StringIO() as buffer:
             buffer.write('Список ингредиентов для покупок:\n')
-            for ingredient, amount in ingredient_totals.items():
-                buffer.write(f'{ingredient} - {amount}\n')
+            for ingredient in ingredient_totals:
+                buffer.write(
+                    f"{ingredient['recipe__ingredients__name']} "
+                    f"({ingredient['recipe__ingredients__measurement_unit']}) "
+                    f"- {ingredient['amount']}\n"
+                )
 
             response.write(buffer.getvalue())
 

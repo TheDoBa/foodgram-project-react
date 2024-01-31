@@ -8,7 +8,7 @@ def username_validator(username):
     cleaned_value = re.sub(r'[^\w.@+-]', '', username)
     if set(username) - set(cleaned_value):
         invalid_characters = set(username) - set(cleaned_value)
-        invalid_chars_str = "".join(invalid_characters)
+        invalid_chars_str = ''.join(invalid_characters)
         raise ValidationError(
             f"Недопустимые символы {invalid_chars_str} в username. "
             "Username может содержать только буквы, цифры и "

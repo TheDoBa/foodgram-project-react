@@ -32,6 +32,26 @@ ALLOWED_HOSTS=000.000.00.00,000.0.0.0,localhost,your_host.com
 ```
 [пример nginx](./infra-dev/nginx.conf)
 
-<br>
+### Настройки в settings:
+```python
+load_dotenv(
+    dotenv_path='../infra-dev/.env'
+)
+```
 
-### Так же требуется перенастройка url путей. 
+```python
+ALLOWED_HOSTS = ['*']
+```
+
+### Настройка в foodgram.urls.py
+
+```python
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('api.urls')),
+]
+```
+
+# Доступ будет: 
+http://localhost/
+<br>
