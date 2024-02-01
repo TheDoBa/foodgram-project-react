@@ -1,7 +1,7 @@
 import io
 from django.db.models import Sum
 from django_filters import rest_framework as filters
-from django.http import HttpResponse
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import permissions, status, viewsets
@@ -21,7 +21,13 @@ from .serializers import (
 )
 from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import IsAuthorOrReadOnly
-from recipes.models import Favorite, Ingredient, Recipe, ShoppingCart, Tag
+from recipes.models import (
+    Ingredient,
+    Recipe,
+    ShoppingCart,
+    Tag,
+    RecipeIngredient
+)
 from users.models import Follow, FoodUser
 
 
@@ -50,16 +56,18 @@ class UserViewSet(DjoserUserViewSet):
 
     @action(detail=True, methods=('post', 'delete'))
     def subscribe(self, request, id=None):
-        """Метод для подписки и отписки."""
-        user = self.request.user
-        following = self.get_object()
+        """Метод для подписки и отписки от авторов."""
+        author = get_object_or_404(FoodUser, id=id)
+        user = request.user
         if request.method == 'POST':
-            Follow.objects.create(user=user, following=following)
+            Follow.objects.get_or_create(user=user, following=author)
             serializer = FollowSubSerializer(
-                following, context={'request': request})
+                instance=Follow(user=user, following=author),
+                context={'request': request}
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         if request.method == 'DELETE':
-            Follow.objects.filter(user=user, following=following).delete()
+            user.following.filter(following=author).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -72,7 +80,6 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = IngredientFilter
-    http_method_names = ('get',)
 
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
@@ -127,15 +134,14 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 'action_name': 'favorite'
             }
         )
-        if request.method == 'POST':
-            if serializer.is_valid():
-                Favorite.objects.create(user=user, recipe=recipe)
-                return Response(
-                    serializer.data, status=status.HTTP_201_CREATED
-                )
-        if request.method == 'DELETE':
-            Favorite.objects.filter(user=user, recipe=recipe).delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        if serializer.is_valid():
+            if request.method == 'POST':
+                serializer.save(user=user, recipe=recipe)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            elif request.method == 'DELETE':
+                recipe.favorite_set.filter(user=user).delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=('post', 'delete'),
             permission_classes=(permissions.IsAuthenticated,))
@@ -151,13 +157,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 'action_name': 'shopping_cart'
             }
         )
-        if request.method == 'POST':
-            if serializer.is_valid():
-                ShoppingCart.objects.create(user=user, recipe=recipe)
-                return Response(
-                    serializer.data, status=status.HTTP_201_CREATED
-                )
-        elif request.method == 'DELETE':
+        if request.method == 'POST' and serializer.is_valid():
+            ShoppingCart.objects.create(user=user, recipe=recipe)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        if request.method == 'DELETE':
             ShoppingCart.objects.filter(user=user, recipe=recipe).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -165,32 +169,32 @@ class RecipeViewSet(viewsets.ModelViewSet):
             permission_classes=(permissions.IsAuthenticated,))
     def download_shopping_cart(self, request):
         user = request.user
-
         ingredient_totals = (
-            ShoppingCart.objects
-            .filter(user=user)
-            .select_related('recipe__ingredients')
+            RecipeIngredient.objects
+            .filter(recipe__shoppingcart__user=user)
             .values(
-                'recipe__ingredients__name',
-                'recipe__ingredients__measurement_unit'
+                'ingredient__name',
+                'ingredient__measurement_unit'
             )
-            .annotate(amount=Sum('recipe__recipe_ingredients__amount'))
+            .annotate(amount=Sum('amount'))
         )
 
-        response = HttpResponse(content_type='text/plain')
-        response['Content-Disposition'] = (
-            'attachment; filename="ShoppingList.txt"'
+        content = 'Список ингредиентов для покупок:\n'
+        for ingredient in ingredient_totals:
+            content += (
+                f'{ingredient["ingredient__name"]} '
+                f'({ingredient["ingredient__measurement_unit"]}) '
+                f'- {ingredient["amount"]}\n'
+            )
+
+        # Преобразуем строку в байты
+        content_bytes = content.encode('utf-8')
+
+        response = FileResponse(
+            io.BytesIO(content_bytes),
+            as_attachment=True,
+            filename="ShoppingList.txt",
+            content_type='text/plain'
         )
-
-        with io.StringIO() as buffer:
-            buffer.write('Список ингредиентов для покупок:\n')
-            for ingredient in ingredient_totals:
-                buffer.write(
-                    f"{ingredient['recipe__ingredients__name']} "
-                    f"({ingredient['recipe__ingredients__measurement_unit']}) "
-                    f"- {ingredient['amount']}\n"
-                )
-
-            response.write(buffer.getvalue())
 
         return response

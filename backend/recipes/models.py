@@ -1,7 +1,7 @@
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from api.validators import color_validator, slug_validator
+from .validators import color_validator, slug_validator
 from core.consts import (
     CHAR_FIELD_LENGTH,
     CHAR_FIELD_LENGTH_COLOR,
@@ -100,6 +100,9 @@ class Recipe(models.Model):
         verbose_name_plural = 'Рецепты'
         ordering = ('-pub_date',)
 
+    def __str__(self):
+        return self.name
+
 
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(
@@ -121,7 +124,12 @@ class RecipeIngredient(models.Model):
     )
 
     class Meta:
-        default_related_name = 'recipe_ingredients'
+        constraints = (
+            models.UniqueConstraint(
+                name='unique_recipe_ingredients ',
+                fields=('recipe', 'ingredient'),
+            ),
+        )
         verbose_name = 'ингредиент рецепта'
         verbose_name_plural = 'Ингредиенты рецепта'
 
