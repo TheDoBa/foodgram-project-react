@@ -1,4 +1,5 @@
 import io
+from django.contrib.auth.hashers import check_password
 from django.db.models import Sum
 from django_filters import rest_framework as filters
 from django.http import FileResponse
@@ -47,7 +48,7 @@ class UserViewSet(DjoserUserViewSet):
     def subscriptions(self, request):
         """Возвращает подписки."""
         user = self.request.user
-        following = FoodUser.objects.filter(following__user=user)
+        following = FoodUser.objects.filter(following__user=user).distinct()
         pages = self.paginate_queryset(following)
         serializer = FollowSerializer(
             pages, many=True, context={'request': request}
@@ -57,18 +58,52 @@ class UserViewSet(DjoserUserViewSet):
     @action(detail=True, methods=('post', 'delete'))
     def subscribe(self, request, id=None):
         """Метод для подписки и отписки от авторов."""
-        author = get_object_or_404(FoodUser, id=id)
-        user = request.user
+        author = get_object_or_404(FoodUser, id=id)  # Изменил на модель User
+        user = self.request.user
         if request.method == 'POST':
-            Follow.objects.get_or_create(user=user, following=author)
             serializer = FollowSubSerializer(
-                instance=Follow(user=user, following=author),
+                data={'user': user.id, 'following': author.id},
                 context={'request': request}
             )
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         if request.method == 'DELETE':
-            user.following.filter(following=author).delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            user = request.user
+            subscribe_instance = Follow.objects.filter(
+                user=user, following=author)
+            if subscribe_instance.exists():
+                subscribe_instance.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=('post',))
+    def set_password(self, request):
+        user = self.request.user
+        if user.is_anonymous:
+            return Response(
+                {'detail': 'Учетные данные аутентификации не предоставлены.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+        if not current_password or not new_password:
+            return Response(
+                {'detail': 'Текущий пароль и новый пароль обязательны.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not check_password(current_password, user.password):
+            return Response(
+                {'detail': 'Текущий пароль неверен.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user.set_password(new_password)
+        user.save()
+        return Response(
+            {'detail': 'Пароль успешно изменен.'},
+            status=status.HTTP_200_OK
+        )
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
@@ -134,15 +169,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 'action_name': 'favorite'
             }
         )
-        if serializer.is_valid():
-            if request.method == 'POST':
-                serializer.save(user=user, recipe=recipe)
-                return Response(
-                    serializer.data, status=status.HTTP_201_CREATED
-                )
-            elif request.method == 'DELETE':
-                recipe.favorite_set.filter(user=user).delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
+        serializer.is_valid(raise_exception=True)
+        if request.method == 'POST':
+            serializer.save(user=user, recipe=recipe)
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED
+            )
+        elif request.method == 'DELETE':
+            recipe.favorite_set.filter(user=user).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(
             serializer.errors, status=status.HTTP_400_BAD_REQUEST
         )
@@ -190,15 +225,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 f'({ingredient["ingredient__measurement_unit"]}) '
                 f'- {ingredient["amount"]}\n'
             )
-
-        # Преобразуем строку в байты
         content_bytes = content.encode('utf-8')
-
         response = FileResponse(
             io.BytesIO(content_bytes),
             as_attachment=True,
-            filename="ShoppingList.txt",
+            filename='ShoppingList.txt',
             content_type='text/plain'
         )
-
         return response

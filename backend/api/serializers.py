@@ -115,13 +115,14 @@ class FollowSubSerializer(serializers.ModelSerializer):
         """Проверяет наличие подписки на самого себя и повторную подписку."""
         request = self.context.get('request')
         user = request.user
-        followed_user = self.instance.following
-        if user == followed_user:
-            raise serializers.ValidationError(
-                'Вы не можете подписаться на себя.')
-        if Follow.objects.filter(user=user, following=followed_user).exists():
-            raise serializers.ValidationError(
-                'Вы уже подписаны на этого пользователя.')
+        if self.instance and hasattr(self.instance, 'following'):
+            followed_user = self.instance.following
+            if user == followed_user:
+                raise serializers.ValidationError(
+                    'Вы не можете подписаться на себя.')
+            if Follow.objects.filter(user=user, following=followed_user).exists():
+                raise serializers.ValidationError(
+                    'Вы уже подписаны на этого пользователя.')
         return data
 
 
