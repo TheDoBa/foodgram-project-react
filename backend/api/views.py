@@ -1,4 +1,5 @@
 import io
+from datetime import datetime
 from django.contrib.auth.hashers import check_password
 from django.db.models import Sum
 from django_filters import rest_framework as filters
@@ -7,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from djoser.views import UserViewSet as DjoserUserViewSet
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
@@ -23,6 +25,7 @@ from .serializers import (
 from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import IsAuthorOrReadOnly
 from recipes.models import (
+    Favorite,
     Ingredient,
     Recipe,
     ShoppingCart,
@@ -48,7 +51,9 @@ class UserViewSet(DjoserUserViewSet):
     def subscriptions(self, request):
         """Возвращает подписки."""
         user = self.request.user
-        following = FoodUser.objects.filter(following__user=user).distinct()
+        print(user)
+        following = user.subscriber.all()
+        print(following)
         pages = self.paginate_queryset(following)
         serializer = FollowSerializer(
             pages, many=True, context={'request': request}
@@ -70,40 +75,27 @@ class UserViewSet(DjoserUserViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         if request.method == 'DELETE':
             user = request.user
-            subscribe_instance = Follow.objects.filter(
-                user=user, following=author)
+            subscribe_instance = user.subscriber.filter(following=author)
             if subscribe_instance.exists():
                 subscribe_instance.delete()
                 return Response(status=status.HTTP_204_NO_CONTENT)
-            else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+        raise ValidationError({'detail': 'Неверный метод запроса.'})
 
     @action(detail=False, methods=('post',))
     def set_password(self, request):
         user = self.request.user
         if user.is_anonymous:
-            return Response(
-                {'detail': 'Учетные данные аутентификации не предоставлены.'},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            raise AuthenticationFailed(
+                'Учетные данные аутентификации не предоставлены.')
         current_password = request.data.get('current_password')
         new_password = request.data.get('new_password')
         if not current_password or not new_password:
-            return Response(
-                {'detail': 'Текущий пароль и новый пароль обязательны.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            raise ValidationError('Текущий пароль и новый пароль обязательны.')
         if not check_password(current_password, user.password):
-            return Response(
-                {'detail': 'Текущий пароль неверен.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            raise ValidationError('Текущий пароль неверен.')
         user.set_password(new_password)
         user.save()
-        return Response(
-            {'detail': 'Пароль успешно изменен.'},
-            status=status.HTTP_200_OK
-        )
+        return Response({'detail': 'Пароль успешно изменен.'})
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
@@ -225,9 +217,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 f'({ingredient["ingredient__measurement_unit"]}) '
                 f'- {ingredient["amount"]}\n'
             )
-        content_bytes = content.encode('utf-8')
         response = FileResponse(
-            io.BytesIO(content_bytes),
+            io.BytesIO(content.encode('utf-8')),
             as_attachment=True,
             filename='ShoppingList.txt',
             content_type='text/plain'

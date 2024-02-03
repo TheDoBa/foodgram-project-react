@@ -3,6 +3,7 @@ import base64
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
 
 from recipes.models import (
     Favorite,
@@ -66,42 +67,54 @@ class FavoriteRecipeSerializer(serializers.ModelSerializer):
 
 
 class FollowSerializer(serializers.ModelSerializer):
-    """Cериализатор подписки."""
-
+    id = serializers.ReadOnlyField(source='following.id')
+    username = serializers.ReadOnlyField(source='following.username')
+    email = serializers.ReadOnlyField(source='following.email')
+    first_name = serializers.ReadOnlyField(source='following.first_name')
+    last_name = serializers.ReadOnlyField(source='following.last_name')
     is_subscribed = serializers.SerializerMethodField()
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.ReadOnlyField(source='recipes.count')
 
     class Meta:
-        model = FoodUser
+        model = Follow
         fields = (
-            'email',
             'id',
             'username',
+            'email',
             'first_name',
             'last_name',
             'is_subscribed',
             'recipes',
-            'recipes_count',
+            'recipes_count'
         )
-        read_only_fields = (
-            'is_subscribed',
-            'recipes',
-            'recipes_count',
-        )
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Follow.objects.all(),
+                fields=['user', 'following']
+            )
+        ]
 
     def get_is_subscribed(self, obj):
-        user = self.context['request'].user
-        return obj.subscriber.filter(user=user).exists()
+        request = self.context.get('request')
+        return request.user.is_authenticated and Follow.objects.filter(
+            user=request.user,
+            following=obj.following
+        ).exists()
 
     def get_recipes(self, obj):
         """Возвращает рецепты автора."""
-        recipes = Recipe.objects.filter(author=obj)
+        recipes = obj.following.recipes.all()
+        recipes_limit = self.context['request'].query_params.get(
+            'recipes_limit')
+
+        if recipes_limit is not None:
+            recipes = recipes[:int(recipes_limit)]
+
         return RecipeReadSerializer(
             recipes,
             many=True,
-            context={'request': self.context.get('request')}
-        ).data
+            context={'request': self.context.get('request')}).data
 
 
 class FollowSubSerializer(serializers.ModelSerializer):
@@ -115,16 +128,19 @@ class FollowSubSerializer(serializers.ModelSerializer):
         """Проверяет наличие подписки на самого себя и повторную подписку."""
         request = self.context.get('request')
         user = request.user
-        if self.instance and hasattr(self.instance, 'following'):
-            followed_user = self.instance.following
-            if user == followed_user:
-                raise serializers.ValidationError(
-                    'Вы не можете подписаться на себя.')
-            if Follow.objects.filter(
-                user=user, following=followed_user
-            ).exists():
-                raise serializers.ValidationError(
-                    'Вы уже подписаны на этого пользователя.')
+
+        # Проверка на подписку на самого себя
+        if user == data['following']:
+            raise serializers.ValidationError(
+                'Вы не можете подписаться на себя.')
+
+        # Проверка на повторную подписку
+        existing_subscription = Follow.objects.filter(
+            user=user, following=data['following'])
+        if existing_subscription.exists():
+            raise serializers.ValidationError(
+                'Вы уже подписаны на этого пользователя.')
+
         return data
 
 
