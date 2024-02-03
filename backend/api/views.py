@@ -1,5 +1,4 @@
 import io
-from datetime import datetime
 from django.contrib.auth.hashers import check_password
 from django.db.models import Sum
 from django_filters import rest_framework as filters
@@ -25,14 +24,13 @@ from .serializers import (
 from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import IsAuthorOrReadOnly
 from recipes.models import (
-    Favorite,
     Ingredient,
     Recipe,
     ShoppingCart,
     Tag,
     RecipeIngredient
 )
-from users.models import Follow, FoodUser
+from users.models import FoodUser
 
 
 class UserViewSet(DjoserUserViewSet):
