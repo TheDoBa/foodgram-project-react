@@ -49,9 +49,7 @@ class UserViewSet(DjoserUserViewSet):
     def subscriptions(self, request):
         """Возвращает подписки."""
         user = self.request.user
-        print(user)
         following = user.subscriber.all()
-        print(following)
         pages = self.paginate_queryset(following)
         serializer = FollowSerializer(
             pages, many=True, context={'request': request}
