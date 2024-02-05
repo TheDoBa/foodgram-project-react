@@ -25,6 +25,7 @@ from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import IsAuthorOrReadOnly
 from recipes.models import (
     Ingredient,
+    Favorite,
     Recipe,
     ShoppingCart,
     Tag,
@@ -157,18 +158,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
                 'action_name': 'favorite'
             }
         )
-        serializer.is_valid(raise_exception=True)
         if request.method == 'POST':
-            serializer.save(user=user, recipe=recipe)
-            return Response(
-                serializer.data, status=status.HTTP_201_CREATED
-            )
-        elif request.method == 'DELETE':
-            recipe.favorite_set.filter(user=user).delete()
+            if serializer.is_valid():
+                Favorite.objects.create(user=user, recipe=recipe)
+                return Response(
+                    serializer.data, status=status.HTTP_201_CREATED
+                )
+        if request.method == 'DELETE':
+            Favorite.objects.filter(user=user, recipe=recipe).delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(
-            serializer.errors, status=status.HTTP_400_BAD_REQUEST
-        )
 
     @action(detail=True, methods=('post', 'delete'),
             permission_classes=(permissions.IsAuthenticated,))
